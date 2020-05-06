@@ -6,12 +6,10 @@ from __future__ import barry_as_FLUFL
 __version__ = '0.1'
 __author__ = 'Dmytro Bohynskyi'
 
-import time  # standard libraries
-import random
-from subprocess import call
+import random  # standard libraries
+import os
 from colr import Colr as C  # custom libraries
 import numpy as np
-import os
 
 
 class Hexagon:
