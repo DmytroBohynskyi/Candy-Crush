@@ -3,141 +3,115 @@
 """
 from __future__ import barry_as_FLUFL
 
-__version__ = '0.1'
+__version__ = '0.2'
 __author__ = 'Dmytro Bohynskyi'
 
-import random  # standard libraries
-import os
-from colr import Colr as C  # custom libraries
-import numpy as np
+import sys
+from PySide2.QtWidgets import QApplication, QMainWindow
+from PySide2.QtCore import Qt
+from GUI import Ui_MainWindow
+from modules import View, User
+
+# Static variables
+KEY_user_1 = {
+    Qt.Key_Q: "q",
+    Qt.Key_A: "a",
+    Qt.Key_Z: "z",
+    Qt.Key_E: "e",
+    Qt.Key_D: "d",
+    Qt.Key_C: "c",
+    Qt.Key_S: "s",
+}
+
+KEY_user_2 = {
+    Qt.Key_7: "q",
+    Qt.Key_4: "a",
+    Qt.Key_1: "z",
+    Qt.Key_9: "e",
+    Qt.Key_6: "d",
+    Qt.Key_3: "c",
+    Qt.Key_5: "s",
+}
 
 
-class Hexagon:
-    """
-    This class defines a hexagonal agent.
-    """
-
-    TYPE = ['FF0000', '555B6E', '4b88b0', "EAF4F4", "21FC0D", 'F6F786']
-
+class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
-        self.type = random.choice(Hexagon.TYPE)
+        # Gui definition
+        super(MainWindow, self).__init__()
+        super(Ui_MainWindow, self).__init__()
+        self.setupUi(self)
 
-    def delete(self):
+        # definition of variables
+        self.window = None  # field gor hexagon
+        self.modification = True  # change of position hexagon
+        self.user_1 = None  # first user
+        self.user_2 = None  # second user
+
+        # Button clicked
+        self.StartButton.clicked.connect(lambda: self.game())  # start of single player mode
+        self.TwoGameButton.clicked.connect(lambda: self.game(hot_sit=True))  # start of hot_sit player mode
+        self.EndButton.clicked.connect(lambda: app.exit())  # closes the program
+
+    def game(self, hot_sit=False):
         """
-
-        :return:None
-        """
-        self.type = random.choice(Hexagon.TYPE)
-
-
-class View:
-    __POS = {
-        "q": (lambda x, y, w, h: (x - 1, y - 1) if x > 0 and y > 0 else None,
-              lambda x, y, w, h: (x, y - 1) if x >= 0 and y > 0 else None),
-
-        "z": (lambda x, y, w, h: (x - 1, y + 1) if x >= 0 and y < h else None,
-              lambda x, y, w, h: (x, y + 1) if x > 0 and y < h else None),
-
-        "e": (lambda x, y, w, h: (x, y - 1) if x <= w and y > 0 else None,
-              lambda x, y, w, h: (x + 1, y - 1) if x < w and y > 0 else None),
-
-        "c": (lambda x, y, w, h: (x, y + 1) if x <= w and y < h else None,
-              lambda x, y, w, h: (x + 1, y + 1) if x < w and y <= h else None),
-
-        "d": (lambda x, y, w, h: (x + 1, y) if x < w else None,
-              lambda x, y, w, h: (x + 1, y) if x < w else None),
-
-        "a": (lambda x, y, w, h: (x - 1, y) if x > 0 else None,
-              lambda x, y, w, h: (x - 1, y) if x > 0 else None)
-    }
-
-    def __init__(self, width=20, height=15):
-        self.width = width
-        self.height = height
-        self.n = width * height
-        self.agents = np.array([Hexagon() for _ in range(self.n)]).reshape(width, height)
-        [self.look_for((x, y)) for y in range(height - 1) for x in range(width - 1)]
-
-    def algorithm(self, x_pos, y_pos, pos):
-        """
-        This function changes the agent's position
-        :param x_pos: x position  is equal to [0 : width - 1]
-        :param y_pos: y position  is equal to [0 : height - 1]
-        :param pos: q  //\\  e
-                    a ||  || d ->
-                    z  \\//  c
+        this function opens game window and close start window.
+        Create class object View and User
+        :param hot_sit:
         :return: None
         """
-        try:
-            function = View.__POS.get(pos)[y_pos % 2]  # get functions depending on the value [pos] and [y_pos % 2]
-            next_pos = function(x_pos, y_pos, self.width, self.height)
-            if next_pos:
-                self.agents[x_pos, y_pos], self.agents[next_pos] = self.agents[next_pos], self.agents[x_pos, y_pos]
-        except TypeError:
-            print("Nieznany kierunek!")
+        self.frame.setVisible(False)  # close start window
+        self.start_frame.setVisible(True)  # open game window
+        self.window = View()  # Create new windows
+        self.user_1 = User()  # Create new user
+        self.user_2 = User() if hot_sit else None  # Create new user
+        self.print_view()  # hexagon show
 
-    def look_for(self, actual):
+    def print_view(self):
+        x, y = self.window.agents.shape
+        text = ""
+        for y_ in range(y):
+            text += "<font> .</font>" if y_ % 2 else "<font>    </font>"
+            for x_, agent in enumerate(self.window.agents[:, y_]):
+                if x > x_ + 1 and y > y_ + 1:
+                    self.window.look_for((x_, y_))  # we are looking for three identical agents
+                if self.user_1 == (x_, y_) or self.user_2 == (x_, y_):
+                    text += f'<font color=#{agent.type}  >⬡</font>'  # position user_1 and user_2
+                else:
+                    text += f'<font color=#{agent.type}  >⬢</font>'  # hexagon
+        self.textEdit.setText(text)
+
+    def keyPressEvent(self, event):
         """
 
-        :param actual: actual position
+        :param event:
         :return: None
         """
-        x, y = actual
-        # adjacent positions
-        position_list = ['q', 'a', 'z', 'e', 'd', 'c', ]
+        if event.key() in KEY_user_1 and self.window and self.user_1:
+            p = KEY_user_1.get(event.key())  # position
+            self.step(self.user_1, self.user_2, p)  # modification
+        elif event.key() in KEY_user_2 and self.window and self.user_2:
+            p = KEY_user_2.get(event.key())
+            self.step(self.user_2, self.user_1, p)  # modification
 
-        # Create dict with adjacent positions
-        position = {p: View.__POS.get(p)[y % 2](x, y, self.width, self.height) for p in position_list}
-        # Create dict with adjacent positions (object)
-        position = {p: self.agents[position[p]] for p in position if position[p]}
-        # Create dict with adjacent positions (object type)
-        position_type = {p: position[p].type for p in position if position[p]}
-
-        actual = self.agents[actual]  # this is main object
-
-        # if they are equal then delete
-        if actual.type == position_type.get('a', None) == position_type.get('d', None):
-            self.del_object(actual, position['a'], position['d'])
-        elif actual.type == position_type.get('e', None) == position_type.get('z', None):
-            self.del_object(actual, position['e'], position['z'])
-        elif actual.type == position_type.get('q', None) == position_type.get('c', None):
-            self.del_object(actual, position['q'], position['c'])
-
-    @staticmethod
-    def del_object(one, two, three):
-        """
-        Thia function delete agents
-        :param one: main agent
-        :param two: agent
-        :param three: agent
-        :return: None
-        """
-        one.delete()
-        two.delete()
-        three.delete()
-
-
-def print_view(view):
-    x, y = view.agents.shape
-    for y_ in range(y):
-        print("\n " if y_ % 2 else "\n", end=" ")
-        for x_, agent in enumerate(view.agents[:, y_]):
-            if x > x_ + 1 and y > y_ + 1:
-                view.look_for((x_, y_))
-            print(C().hex(agent.type, "*", rgb_mode=True), end=" ")
-
-
-if __name__ == '__main__':
-    window = View()  # Create new windows
-    game = True
-    while game:
-        print_view(window)
-        try:
-            x = int(input('\n podaj pozycje x : '))  # user input value of x
-            y = int(input('podaj pozycje y : '))  # user input value of x
-        except:
-            game = False if x == 'end' else True  # if the user input "end" then finish the loops
+    def step(self, user, opponent, p):
+        if p == 's':
+            self.modification = False
+            if opponent is not None:
+                opponent.act = False
         else:
-            p = input('Gdzie: ')  # user input direction of shift
-            window.algorithm(x - 1, y - 1, p)  # shifting algorithm
-            os.system('cls')  # clear terminal
+            self.window.algorithm(user.position, p) if not self.modification else None
+            user.algorithm(p)
+            self.modification = True
+            if opponent is not None:
+                opponent.act = True
+
+        self.print_view()
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+
+    window = MainWindow()
+    window.show()
+
+    sys.exit(app.exec_())
